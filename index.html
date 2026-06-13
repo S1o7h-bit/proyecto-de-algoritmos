@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Pelea RPG</title>
+    <style>
+        body {
+            background-image: url('https://img.magnific.com/vector-gratis/paisaje-cueva-oscura_1308-16279.jpg'); 
+            background-size: cover;           /* Hace que la imagen cubra toda la pantalla */
+            background-position: center;      /* Centra la imagen */
+            background-attachment: fixed;     /* El fondo se queda fijo al hacer scroll */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #5c0d0d;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h1 { color: #e94560; text-shadow: 2px 2px #0f3460; }
+
+        .battlefield {
+            display: flex;
+            justify-content: space-around;
+            width: 80%;
+            max-width: 800px;
+            margin: 30px 0;
+            background: #5c0d0d;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        .character-card {
+            text-align: center;
+            width: 45%;
+            transition: transform 0.2s;
+        }
+
+        /* Animación de ataque */
+        .attacking { transform: scale(1.1) translateY(-10px); }
+
+        .avatar {
+            font-size: 80px;
+            margin-bottom: 10px;
+        }
+
+        .name { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+
+        /* Barras de Vida */
+        .health-bar-container {
+            background-color: #451e3e;
+            border-radius: 10px;
+            overflow: hidden;
+            width: 100%;
+            height: 25px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .health-bar {
+            background-color: #e94560;
+            height: 100%;
+            width: 100%;
+            transition: width 0.4s ease-in-out;
+        }
+
+        .health-text { font-size: 14px; margin-top: 5px; }
+
+        /* Consola de Texto Inferior */
+        .console-box {
+            width: 80%;
+            max-width: 800px;
+            height: 150px;
+            background-color: #580505;
+            border-left: 5px solid #e94560;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            box-sizing: border-box;
+        }
+
+        .btn-start {
+            background-color: #e94560;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+            transition: 0.2s;
+        }
+        .btn-start:hover { background-color: #ff5270; transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+
+    <h1>⚔️ Arena de Batalla ⚔️</h1>
+    <button class="btn-start" onclick="iniciarSimulacion()">¡Iniciar Pelea!</button>
+
+    <div class="battlefield">
+        <div id="card-jugador" class="character-card">
+            <div class="avatar">🧙‍♂️</div>
+            <div class="name" id="p1-name">Jugador</div>
+            <div class="health-bar-container">
+                <div id="p1-bar" class="health-bar"></div>
+            </div>
+            <div class="health-text" id="p1-text">HP: --/--</div>
+        </div>
+
+        <div id="card-enemigo" class="character-card">
+            <div class="avatar" id="p2-avatar">👾</div>
+            <div class="name" id="p2-name">Enemigo</div>
+            <div class="health-bar-container">
+                <div id="p2-bar" class="health-bar"></div>
+            </div>
+            <div class="health-text" id="p2-text">HP: --/--</div>
+        </div>
+    </div>
+
+    <div class="console-box" id="console">
+        &gt; Presiona "Iniciar Pelea" para comenzar la simulación...
+    </div>
+
+    <script>
+        const retrasoEntreTurnos = 1500; // Milisegundos entre cada acción
+
+        // Diccionario para cambiar el avatar según el nombre del enemigo
+        const avatares = { "Goblin": "👺", "Kobold": "🦎", "Esbirro": "💀" };
+
+        async function iniciarSimulacion() {
+            const consoleBox = document.getElementById("console");
+            consoleBox.innerHTML = "&gt; Conectando con la arena de combate...";
+
+            try {
+                // Llamamos a nuestra API de FastAPI
+                const respuesta = await fetch("http://127.0.0.1:8000/simular-pelea");
+                const datos = await respuesta.json();
+                const historial = datos.historial;
+
+                reproducirBatalla(historial);
+            } catch (error) {
+                consoleBox.innerHTML = "&gt; ❌ Error: Asegúrate de que el backend de Python esté corriendo.";
+            }
+        }
+
+        function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+        async function reproducirBatalla(historial) {
+            const consoleBox = document.getElementById("console");
+            consoleBox.innerHTML = "";
+
+            for (let paso of historial) {
+                // Actualizar los textos de la consola web
+                const p = document.createElement("p");
+                p.textContent = paso.mensaje;
+                consoleBox.appendChild(p);
+                consoleBox.scrollTop = consoleBox.scrollHeight; // Auto-scroll al final
+
+                // Si hay datos de los personajes en este paso, actualizamos la interfaz visual
+                if (paso.jugador && paso.enemigo) {
+                    actualizarUI(paso.jugador, paso.enemigo);
+                    
+                    // Si fue un turno de ataque, añadimos una pequeña animación visual
+                    if (paso.accion === "atacar") {
+                        const tarjetaAtacante = paso.atacante === "Jugador" ? "card-jugador" : "card-enemigo";
+                        document.getElementById(tarjetaAtacante).classList.add("attacking");
+                        await sleep(200);
+                        document.getElementById(tarjetaAtacante).classList.remove("attacking");
+                    }
+                }
+                
+                // Esperamos un momento antes de mostrar el siguiente evento
+                await sleep(retrasoEntreTurnos);
+            }
+        }
+
+        function actualizarUI(jugador, enemigo) {
+            // Jugador
+            document.getElementById("p1-name").textContent = jugador.nombre;
+            document.getElementById("p1-text").textContent = `HP: ${jugador.vida} / ${jugador.vida_max}`;
+            const pctJugador = (jugador.vida / jugador.vida_max) * 100;
+            document.getElementById("p1-bar").style.width = `${pctJugador}%`;
+
+            // Enemigo
+            document.getElementById("p2-name").textContent = enemigo.nombre;
+            document.getElementById("p2-avatar").textContent = avatares[enemigo.nombre] || "👾";
+            document.getElementById("p2-text").textContent = `HP: ${enemigo.vida} / ${enemigo.vida_max}`;
+            const pctEnemigo = (enemigo.vida / enemigo.vida_max) * 100;
+            document.getElementById("p2-bar").style.width = `${pctEnemigo}%`;
+        }
+    </script>
+</body>
+</html>
