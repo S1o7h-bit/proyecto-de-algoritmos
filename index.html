@@ -139,7 +139,7 @@
 
             try {
                 // Llamamos a nuestra API de FastAPI
-                const respuesta = await fetch("https://railway.com/project/d8272042-3b61-4f9a-a31e-09e790f79a38?environmentId=1f05b8ed-8a15-4827-bf52-4982bda78989");
+                const respuesta = await fetch("proyecto-de-algoritmos-production.up.railway.app");
                 const datos = await respuesta.json();
                 const historial = datos.historial;
 
